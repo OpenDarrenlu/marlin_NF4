@@ -14,10 +14,10 @@ torch.random.manual_seed(seed)
 DEV = torch.device('cuda:0')
 
 
-def gen_quant4(m, n, groupsize=-1):
+def gen_quant4(k, n, groupsize=-1):
     tile = 16
     maxq = 2 ** 4 - 1
-    w = torch.randn((m, n), dtype=torch.half, device=DEV)
+    w = torch.randn((k, n), dtype=torch.half, device=DEV)
     if groupsize != -1:
         w = w.reshape((-1, groupsize, n))
         w = w.permute(1, 0, 2)
@@ -32,22 +32,22 @@ def gen_quant4(m, n, groupsize=-1):
         def reshape(w):
             w = w.reshape((groupsize, -1, n))
             w = w.permute(1, 0, 2)
-            w = w.reshape((m, n)).contiguous()
+            w = w.reshape((k, n)).contiguous()
             return w
         ref = reshape(ref)
         w = reshape(w)
     s = s.reshape((-1, n)).contiguous()
-    linear = nn.Linear(m, n)
+    linear = nn.Linear(k, n)
     linear.weight.data = ref.t()
     # Workaround to test some special cases that are forbidden by the API
     layer = marlin.Layer(256, 256, groupsize=groupsize)
     if groupsize == -1:
-        groupsize = m
-    layer.k = m
+        groupsize = k
+    layer.k = k
     layer.n = n
     layer.groupsize = groupsize
-    layer.B = torch.empty((m // 16, n * 16 // 8), dtype=torch.int, device=DEV)
-    layer.s = torch.empty((m // groupsize, n), dtype=torch.half, device=DEV)
+    layer.B = torch.empty((k // 16, n * 16 // 8), dtype=torch.int, device=DEV)
+    layer.s = torch.empty((k // groupsize, n), dtype=torch.half, device=DEV)
     layer.pack(linear, s.t())
     q = layer.B
     s = layer.s
@@ -156,4 +156,4 @@ class Test(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(defaultTest='Test.test_errors', verbosity=2)
