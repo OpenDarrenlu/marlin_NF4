@@ -22,11 +22,13 @@ def gen_quant4(k, n, groupsize=-1):
         w = w.reshape((-1, groupsize, n))
         w = w.permute(1, 0, 2)
         w = w.reshape((groupsize, -1))
+    # Quantize weight to int4([0,15])
     s = torch.max(torch.abs(w), 0, keepdim=True)[0]
     s *= 2 / maxq
     w = torch.round(w / s).int()
     w += (maxq + 1) // 2
     w = torch.clamp(w, 0, maxq)
+    # 将量化后的权重反量化为半精度浮点数，作为参考结果（即量化后理论上不存在量化误差）
     ref = (w - (maxq + 1) // 2).half() * s
     if groupsize != -1:
         def reshape(w):
